@@ -14,9 +14,11 @@
  * the License.
  */
 
-import Ember from 'ember';
+package com.linkedin.drelephant.exceptions;
 
-export default Ember.Controller.extend({
-  queryParams: ['applicationid'],
-  applicationid: null
-});
+/**
+ * This enum represents the state of the job
+ */
+public enum JobState {
+  SCRIPTFAIL, SCHEDULERFAIL, MRFAIL, SUCCEEDED, KILLED
+}

@@ -14,9 +14,9 @@
  * the License.
  */
 
-import Ember from 'ember';
+import DS from 'ember-data';
 
-export default Ember.Controller.extend({
-  queryParams: ['applicationid'],
-  applicationid: null
+export default DS.Model.extend({
+  exceptionenabled: DS.attr("string"),
+  schedulers: DS.attr()
 });

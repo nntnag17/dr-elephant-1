@@ -18,13 +18,13 @@ import Ember from 'ember';
 
 export default Ember.Route.extend({
 
-  beforeModel(transition) {
-  this.finishTimeBegin = transition.queryParams.finishTimeBegin;
-  this.finishTimeEnd = transition.queryParams.finishTimeEnd;
-  this.sortKey = transition.queryParams.sortKey;
-  this.increasing = transition.queryParams.increasing;
+  notifications: Ember.inject.service('notification-messages'), beforeModel(transition) {
+    this.finishTimeBegin = transition.queryParams.finishTimeBegin;
+    this.finishTimeEnd = transition.queryParams.finishTimeEnd;
+    this.sortKey = transition.queryParams.sortKey;
+    this.increasing = transition.queryParams.increasing;
     this.users = transition.queryParams.usernames;
-    if(this.users!="" && this.users!=null) {
+    if (this.users != "" && this.users != null) {
       this.set("usernames", transition.queryParams.usernames.split(","));
     } else {
       this.set("usernames", {});
@@ -32,7 +32,7 @@ export default Ember.Route.extend({
   },
 
   model() {
-    if(this.users!=null && this.users!="") {
+    if (this.users != null && this.users != "") {
       let userdetails = this.store.queryRecord('user-detail', {
         'usernames': this.users,
         'finished-time-begin': this.finishTimeBegin,
@@ -46,28 +46,32 @@ export default Ember.Route.extend({
     }
   },
 
-  error(error, transition) {
-    if (error.errors[0].status == 404) {
-      this.get('notifications').error('No applications found for given query!', {
-        autoClear: true,
-      });
-      this.set("showUserDetails", false);
+  actions: {
+    error(error, transition) {
+      if (error.errors[0].status == 404) {
+        this.get('notifications').error('No applications found for given query!', {
+          autoClear: true,
+        });
+        this.set("showUserDetails", false);
+      }
     }
   },
-  setupController: function(controller, model){
-    if(model==null) {
+
+  setupController: function (controller, model) {
+    if (model == null) {
       controller.set("showUserDetails", false);
       controller.set("usernameSet", new Set());
       controller.set("usernamesArray", Ember.A([]));
       return;
     }
     controller.set('model', model);
+    controller.set("showUserDetails", true);
 
     let usernameSet = new Set();
-    for(var i=0;i<this.get('usernames').length; i++) {
-     usernameSet.add(this.get('usernames')[i]);
+    for (var i = 0; i < this.get('usernames').length; i++) {
+      usernameSet.add(this.get('usernames')[i]);
     }
-    controller.set("usernameSet",usernameSet);
+    controller.set("usernameSet", usernameSet);
     controller.set("usernamesArray", Array.from(usernameSet));
   }
 });

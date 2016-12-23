@@ -38,6 +38,16 @@ public class HadoopSecurity {
   private String _keytabUser;
   private boolean _securityEnabled = false;
 
+
+  private static HadoopSecurity instance = null;
+
+  public static HadoopSecurity getInstance() throws IOException{
+    if(instance==null) {
+      return new HadoopSecurity();
+    }
+    return instance;
+  }
+
   public HadoopSecurity() throws IOException {
     Configuration conf = new Configuration();
     UserGroupInformation.setConfiguration(conf);

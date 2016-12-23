@@ -32,10 +32,17 @@ import com.linkedin.drelephant.analysis.ApplicationType;
 import com.linkedin.drelephant.analysis.Heuristic;
 import com.linkedin.drelephant.analysis.JobType;
 import com.linkedin.drelephant.analysis.Severity;
+import com.linkedin.drelephant.exceptions.ExceptionFinder;
+import com.linkedin.drelephant.exceptions.HadoopException;
+import com.linkedin.drelephant.security.HadoopSecurity;
+import com.linkedin.drelephant.util.InfoExtractor;
 import com.linkedin.drelephant.util.Utils;
 import controllers.ControllerUtil;
 import controllers.IdUrlPair;
 
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -1701,6 +1708,186 @@ public class Web extends Controller {
     parent.add(JsonKeys.USER_DETAILS, userResult);
     return ok(new Gson().toJson(parent));
   }
+
+  /**
+   * Returns the status of the exception feature.
+   * return: JsonObject corresponding to the exception status
+   * response:
+   *
+   * {
+   * "exception-statuses": {
+   * "exceptionenabled": "true",
+   * "schedulers": [
+   *    {
+   *       "name": "azkaban"
+   *    }
+   *  ],
+   *  "id": "exception-status"
+   *  }
+   * }
+   */
+  public static Result restExceptionStatuses () {
+    JsonObject parent = new JsonObject();
+    Set<String> schedulersConfigured = InfoExtractor.getSchedulersConfiguredForException();
+    JsonObject exception = new JsonObject();
+    if(schedulersConfigured.isEmpty()) {
+      exception.addProperty(JsonKeys.EXCEPTION_ENABLED, "true");
+      exception.add(JsonKeys.SCHEDULERS, new JsonArray());
+
+      exception.addProperty(JsonKeys.ID, "exception-status");
+      parent.add(JsonKeys.EXCEPTION_STATUSES, exception);
+      return ok(new Gson().toJson(parent));
+    }
+
+    JsonArray schedulers = new JsonArray();
+    for(String scheduler: schedulersConfigured) {
+      JsonObject schedulerObject = new JsonObject();
+      schedulerObject.addProperty(JsonKeys.NAME, scheduler);
+      schedulers.add(schedulerObject);
+    }
+    exception.addProperty(JsonKeys.EXCEPTION_ENABLED, "true");
+    exception.add(JsonKeys.SCHEDULERS, schedulers);
+    exception.addProperty(JsonKeys.ID, "exception-status");
+    parent.add(JsonKeys.EXCEPTION_STATUSES, exception);
+    return ok(new Gson().toJson(parent));
+  }
+
+
+
+  /**
+   * Controls Exceptions
+   * @throws URISyntaxException
+   */
+  public static Result restExceptions() throws URISyntaxException, MalformedURLException, IOException {
+    DynamicForm form = Form.form().bindFromRequest(request());
+    String url = form.get("flow-exec-url");
+    JsonObject parent = new JsonObject();
+
+    String scheduler = form.get("scheduler");
+
+    HadoopSecurity _hadoopSeverity = HadoopSecurity.getInstance();
+
+
+    logger.info(String.format("scheduler + ", scheduler));
+    if(scheduler==null) {
+      scheduler = "azkaban";
+      logger.info(String.format("Setting scheduler ", scheduler));
+    }
+    if(!InfoExtractor.getSchedulersConfiguredForException().contains(scheduler)) {
+      logger.info("scheduler not found ");
+      parent.add("workflow-exceptions", new JsonArray());
+      return status(503,"Service is currently unavailable");
+    }
+    if (url == null || url.isEmpty()) {
+      parent.add("workflow-exceptions", new JsonArray());
+      return notFound(new Gson().toJson(parent));
+    } else {
+      ExceptionFinder expGen = new ExceptionFinder(url, scheduler);
+      HadoopException flowException = expGen.getExceptions();
+
+      JsonArray jobsArray = new JsonArray();
+
+      if (!flowException.getChildExceptions().isEmpty()) {
+        for (HadoopException jobException : flowException.getChildExceptions()) {
+          JsonObject job = new JsonObject();
+          job.addProperty(JsonKeys.NAME, jobException.getId());
+          job.addProperty(JsonKeys.TYPE, jobException.getType().toString());
+
+          if (jobException.getType() == HadoopException.HadoopExceptionType.SCHEDULER) {
+            if (jobException.getLoggingEvent() != null && jobException.getLoggingEvent().getLog() != null) {
+              job.addProperty(JsonKeys.EXCEPTION_SUMMARY, getSchedulerLog(jobException.getLoggingEvent().getLog()));
+              job.addProperty(JsonKeys.ID, url);
+              job.addProperty(JsonKeys.STATUS, "failed");
+            } else {
+              job.addProperty(JsonKeys.EXCEPTION_SUMMARY, "");
+              job.addProperty(JsonKeys.ID, url);
+              job.addProperty(JsonKeys.STATUS, "failed");
+            }
+          }
+
+
+          if (jobException.getType() == HadoopException.HadoopExceptionType.SCRIPT) {
+            if (jobException.getLoggingEvent() != null && jobException.getLoggingEvent().getLog() != null) {
+              job.addProperty(JsonKeys.EXCEPTION_SUMMARY, getSchedulerLog(jobException.getLoggingEvent().getLog()));
+              job.addProperty(JsonKeys.ID, url);
+              job.addProperty(JsonKeys.STATUS, "failed");
+            } else {
+              job.addProperty(JsonKeys.EXCEPTION_SUMMARY, "");
+              job.addProperty(JsonKeys.ID, url);
+              job.addProperty(JsonKeys.STATUS, "failed");
+            }
+          }
+
+          JsonArray mrExceptionsArray = new JsonArray();
+          if (jobException.getType() == HadoopException.HadoopExceptionType.MR) {
+            for (HadoopException mrJobException : jobException.getChildExceptions()) {
+              JsonObject child = new JsonObject();
+              child.addProperty(JsonKeys.NAME, mrJobException.getId());
+              if (mrJobException.getLoggingEvent() != null && mrJobException.getLoggingEvent().getLog() != null) {
+                child.addProperty(JsonKeys.EXCEPTION_SUMMARY, getSchedulerLog(mrJobException.getLoggingEvent().getLog()));
+              } else {
+                child.addProperty(JsonKeys.EXCEPTION_SUMMARY, "");
+              }
+
+              JsonArray taskExceptionsArray = new JsonArray();
+              for (HadoopException mrTaskException : mrJobException.getChildExceptions()) {
+                JsonObject task = new JsonObject();
+                task.addProperty(JsonKeys.NAME, mrTaskException.getId());
+                if (mrTaskException.getLoggingEvent() != null && mrTaskException.getLoggingEvent().getLog() != null) {
+                  task.addProperty(JsonKeys.EXCEPTION_SUMMARY, getSchedulerLog(mrTaskException.getLoggingEvent().getLog()));
+                } else {
+                  task.addProperty(JsonKeys.EXCEPTION_SUMMARY, "");
+                }
+                taskExceptionsArray.add(task);
+              }
+              child.add(JsonKeys.TASKS, taskExceptionsArray);
+              mrExceptionsArray.add(child);
+            }
+
+            if(jobException.getChildExceptions().isEmpty()) {
+              JsonObject child = new JsonObject();
+              child.addProperty(JsonKeys.NAME,"");
+              child.add(JsonKeys.TASKS, new JsonArray());
+              child.addProperty(JsonKeys.EXCEPTION_SUMMARY, getSchedulerLog(jobException.getLoggingEvent().getLog()));
+              mrExceptionsArray.add(child);
+            }
+            job.add(JsonKeys.APPLICATIONS, mrExceptionsArray);
+            if(jobException.getId()!=null) {
+              job.addProperty(JsonKeys.ID, jobException.getId());
+            } else {
+              job.addProperty(JsonKeys.ID,url);
+            }
+            job.addProperty(JsonKeys.STATUS, "failed");
+          }
+          jobsArray.add(job);
+        }
+        parent.add(JsonKeys.WORKFLOW_EXCEPTIONS, jobsArray);
+        return ok(new Gson().toJson(parent));
+      }
+      parent.add(JsonKeys.WORKFLOW_EXCEPTIONS, jobsArray);
+      return ok(new Gson().toJson(parent));
+    }
+  }
+
+  /**
+   * TAkes a list of strings and appends returns a single string
+   * @param logs The logs by the scheduler
+   * @return The scheduler logs
+   */
+  private static String getSchedulerLog(List<List<String>> logs) {
+    if(logs==null || logs.isEmpty()) {
+      return "";
+    }
+    StringBuilder builder = new StringBuilder();
+    for(List<String> lines: logs) {
+      for(String line: lines) {
+        builder.append(line);
+        builder.append("\n");
+      }
+    }
+    return builder.toString();
+  }
+
 
   /**
    * Generates the query for returning the application summaries
