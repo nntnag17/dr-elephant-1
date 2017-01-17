@@ -91,7 +91,7 @@ public class AzkabanWorkflowClient implements WorkflowClient {
   private String AZKABAN_LOG_OFFSET = "0";
   private String AZKABAN_LOG_LENGTH_LIMIT = "99999999";
 
-  Map<String,AzkabanJobLogAnalyzer> jobIdToLog;
+  Map<String, AzkabanJobLogAnalyzer> jobIdToLog;
 
   /**
    * Constructor for AzkabanWorkflowClient
@@ -107,8 +107,7 @@ public class AzkabanWorkflowClient implements WorkflowClient {
     this.setAzkabanServerUrl(url);
     this.setExecutionId(url);
     this._workflowExecutionUrl = url;
-    this.jobIdToLog = new HashMap<String,AzkabanJobLogAnalyzer>();
-
+    this.jobIdToLog = new HashMap<String, AzkabanJobLogAnalyzer>();
   }
 
   /**
@@ -117,7 +116,8 @@ public class AzkabanWorkflowClient implements WorkflowClient {
    * @throws MalformedURLException
    * @throws URISyntaxException
    */
-  private void setAzkabanServerUrl(String azkabanWorkflowUrl) throws MalformedURLException, URISyntaxException{
+  private void setAzkabanServerUrl(String azkabanWorkflowUrl)
+      throws MalformedURLException, URISyntaxException {
     this._azkabanUrl = "https://" + new URL(azkabanWorkflowUrl).getAuthority();
   }
 
@@ -127,7 +127,8 @@ public class AzkabanWorkflowClient implements WorkflowClient {
    * @throws MalformedURLException
    * @throws URISyntaxException
    */
-  private void setExecutionId(String azkabanWorkflowUrl) throws MalformedURLException, URISyntaxException {
+  private void setExecutionId(String azkabanWorkflowUrl)
+      throws MalformedURLException, URISyntaxException {
     List<NameValuePair> params = URLEncodedUtils.parse(new URI(azkabanWorkflowUrl), "UTF-8");
     for (NameValuePair param : params) {
       if (param.getName() == "execid") {
@@ -149,8 +150,8 @@ public class AzkabanWorkflowClient implements WorkflowClient {
       headlessChallenge = getHeadlessChallenge(username);
       decodedPwd = decodeHeadlessChallenge(headlessChallenge, _privateKey);
     } catch (Exception e) {
-      logger.error("Unexpected error encountered while decoding headless challenge "
-          + headlessChallenge + e.toString());
+      logger
+          .error("Unexpected error encountered while decoding headless challenge " + headlessChallenge + e.toString());
     }
     login(username, decodedPwd);
   }
@@ -158,8 +159,8 @@ public class AzkabanWorkflowClient implements WorkflowClient {
   /**
    * Authenticates Dr. Elephant in Azkaban and sets the sessionId
    *
-   * @param userName
-   * @param password
+   * @param userName The username of the user
+   * @param password The password of the user
    */
   @Override
   public void login(String userName, String password) {
@@ -180,8 +181,6 @@ public class AzkabanWorkflowClient implements WorkflowClient {
       e.printStackTrace();
     }
   }
-
-
 
   /**
    * Makes REST API Call for given url parameters and returns the json object
@@ -246,6 +245,12 @@ public class AzkabanWorkflowClient implements WorkflowClient {
     return jsonObj;
   }
 
+  /**
+   * Parses the content given in the form of input stream to String
+   * @param response the inputstream
+   * @return The string parsed from the given inputstream
+   * @throws IOException Throws IOException if the inputstream cannot be parsed to the string
+   */
   private String parseContent(InputStream response)
       throws IOException {
     BufferedReader reader = null;
@@ -268,10 +273,9 @@ public class AzkabanWorkflowClient implements WorkflowClient {
     return result.toString();
   }
 
-
   /**
-   * @param username
-   * @return
+   * @param username The username of the user
+   * @return Encoded password of the user
    * @throws IOException private String getHeadlessChallenge(String username) throws IOException {
    */
 
@@ -283,9 +287,8 @@ public class AzkabanWorkflowClient implements WorkflowClient {
 
     try {
       String userUrl = _azkabanUrl + "/restli/liuser?action=headlessChallenge";
-      HttpPost request =
-          new HttpPost(userUrl);
-      StringEntity params = new StringEntity("{\"username\":\"" + username+ "\"}");
+      HttpPost request = new HttpPost(userUrl);
+      StringEntity params = new StringEntity("{\"username\":\"" + username + "\"}");
       request.addHeader("content-type", "application/json");
       request.setEntity(params);
       HttpResponse response = httpClient.execute(request);
@@ -293,14 +296,27 @@ public class AzkabanWorkflowClient implements WorkflowClient {
       JSONObject jobject = new JSONObject(responseString);
       encodedPassword = jobject.getString("value");
     } catch (Exception ex) {
-        throw new RuntimeException("Unexpected exception in decoding headless account " + ex.toString());
+      throw new RuntimeException("Unexpected exception in decoding headless account " + ex.toString());
     } finally {
       httpClient.close();
       return encodedPassword;
     }
   }
 
-  private String decodeHeadlessChallenge(String encodedPassword,File _privateKey)
+  /**
+   * Decodes the encoded password using the _privateKey
+   * @param encodedPassword
+   * @param _privateKey
+   * @return The decoded password
+   * @throws IOException
+   * @throws NoSuchAlgorithmException
+   * @throws InvalidKeySpecException
+   * @throws NoSuchPaddingException
+   * @throws InvalidKeyException
+   * @throws IllegalBlockSizeException
+   * @throws BadPaddingException
+   */
+  private String decodeHeadlessChallenge(String encodedPassword, File _privateKey)
       throws IOException, NoSuchAlgorithmException, InvalidKeySpecException, NoSuchPaddingException,
              InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
 
@@ -328,7 +344,10 @@ public class AzkabanWorkflowClient implements WorkflowClient {
     return new String(decodedBytes, ASCII);
   }
 
-
+  /**
+   * Returns the jobs from the flow
+   * @return The jobs from the flow
+   */
   public Map<String, String> getJobsFromFlow() {
     List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
     urlParameters.add(new BasicNameValuePair("session.id", _sessionId));
@@ -350,6 +369,12 @@ public class AzkabanWorkflowClient implements WorkflowClient {
     return null;
   }
 
+  /**
+   * Returns the azkaban flow log
+   * @param offset The offset from which logs should be found
+   * @param maximumlLogLengthLimit The maximum log length limit
+   * @return The azkaban flow logs
+   */
   public String getAzkabanFlowLog(String offset, String maximumlLogLengthLimit) {
     List<NameValuePair> urlParameters = new ArrayList<NameValuePair>();
     urlParameters.add(new BasicNameValuePair("session.id", _sessionId));
@@ -370,17 +395,16 @@ public class AzkabanWorkflowClient implements WorkflowClient {
     return null;
   }
 
-
   @Override
   public void analyzeJob(String jobId) {
     String rawAzkabanJobLog = getAzkabanJobLog(jobId, AZKABAN_LOG_OFFSET, AZKABAN_LOG_LENGTH_LIMIT);
     AzkabanJobLogAnalyzer analyzedLog = new AzkabanJobLogAnalyzer(rawAzkabanJobLog);
-    jobIdToLog.put(jobId,analyzedLog);
+    jobIdToLog.put(jobId, analyzedLog);
   }
 
   @Override
   public Set<String> getYarnApplicationsFromJob(String jobId) {
-    if(!jobIdToLog.containsKey(jobId)) {
+    if (!jobIdToLog.containsKey(jobId)) {
       throw new RuntimeException("No job with id " + jobId + " found");
     }
     return jobIdToLog.get(jobId).getSubEvents();
@@ -388,16 +412,15 @@ public class AzkabanWorkflowClient implements WorkflowClient {
 
   @Override
   public JobState getJobState(String jobId) {
-      if(!jobIdToLog.containsKey(jobId)) {
-        throw new RuntimeException("No job with id " + jobId + " found");
-      }
+    if (!jobIdToLog.containsKey(jobId)) {
+      throw new RuntimeException("No job with id " + jobId + " found");
+    }
     return jobIdToLog.get(jobId).getState();
   }
 
-
   @Override
   public LoggingEvent getJobException(String jobId) {
-    if(!jobIdToLog.containsKey(jobId)) {
+    if (!jobIdToLog.containsKey(jobId)) {
       throw new RuntimeException("No job with id " + jobId + " found");
     }
     return jobIdToLog.get(jobId).getException();

@@ -29,7 +29,7 @@ import java.util.Set;
 public interface WorkflowClient {
 
   /**
-   * Login to the scheduler using the username and the passworld
+   * Login to the scheduler using the username and the password
    * @param username The username of the user
    * @param password The password of the user
    */
@@ -47,11 +47,11 @@ public interface WorkflowClient {
    * is the execution id of the job and the value is the status of the job.
    * @return Return all the jobs in the workflow
    */
-  public Map<String,String> getJobsFromFlow();
+  public Map<String, String> getJobsFromFlow();
 
   /**
    * Given a job id, this method analyzes the job
-   * @param jobId
+   * @param jobId The execution id of the job
    */
   public void analyzeJob(String jobId);
 
@@ -75,5 +75,4 @@ public interface WorkflowClient {
    * @return The exeception encountered
    */
   public LoggingEvent getJobException(String jobId);
-
 }

@@ -46,7 +46,6 @@ public class AzkabanJobLogAnalyzer {
       "\\d{2}[-/]\\d{2}[-/]\\d{4} \\d{2}:\\d{2}:\\d{2} (PST|PDT) [^\\s]+ (?:ERROR|WARN|FATAL|Exception) .*\\n");
   private Pattern _mrJobIdPattern = Pattern.compile("job_[0-9]+_[0-9]+");
 
-
   /**
    * Failure at Azkaban job log is broadly categorized into three categorized into three categories
    * SCHEDULERFAIL: Failure at azkaban level
