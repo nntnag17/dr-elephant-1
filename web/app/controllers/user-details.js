@@ -52,7 +52,7 @@ export default Ember.Controller.extend({
     var totalEntries = this.get("model.total");
     if(totalEntries>0 && this.get("model")!={}) {
       if(this.get("finishTimeBegin")==null && this.get("finishTimeEnd")==null) {
-        this.get('notifications').info('Showing result for last one month!', {
+        this.get('notifications').info('Showing result for last one week!', {
           autoClear: true
         });
       }
@@ -90,9 +90,15 @@ export default Ember.Controller.extend({
 
     /** show notification if no results **/
     if (this.get("model.total") == 0) {
-      this.get('notifications').error('No applications found for given query!', {
-        autoClear: true
-      });
+      if(this.get("finishTimeBegin")==null && this.get("finishTimeEnd")==null) {
+        this.get('notifications').error('No applications found for last week. Try different date range!', {
+          autoClear: true
+        });
+      } else {
+        this.get('notifications').error('No applications found!', {
+          autoClear: true
+        });
+      }
     }
   }),
 

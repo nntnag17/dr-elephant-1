@@ -1597,7 +1597,7 @@ public class Web extends Controller {
     String usernameQueryString = StringUtils.join(usernameQueryList, " or ");
 
     // by default, fetch data from last week
-    String finishedTimeBegin = String.valueOf(System.currentTimeMillis() - DAY * 7);
+    String finishedTimeBegin = String.valueOf(System.currentTimeMillis() - DAY * 7); // week of data if not specified
     String finishedTimeEnd = String.valueOf(System.currentTimeMillis());
 
     if (Utils.isSet(filterParamsForUserSummary.get(Application.FINISHED_TIME_BEGIN))) {
@@ -1908,7 +1908,7 @@ public class Web extends Controller {
 
     String finishedTimeBegin = searchParams.get(Application.FINISHED_TIME_BEGIN);
     if (!Utils.isSet(finishedTimeBegin)) {
-      finishedTimeBegin = String.valueOf(System.currentTimeMillis() - 31 * DAY); // month of data if not specified
+      finishedTimeBegin = String.valueOf(System.currentTimeMillis() - 7 * DAY); // week of data if not specified
     }
 
     long time = parseTime(finishedTimeBegin);
