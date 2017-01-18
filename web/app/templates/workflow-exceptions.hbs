@@ -53,6 +53,7 @@
       {{#unless (eq model null)}}
         <div class="shadow summary-list-container">
           <div class="summary-list-header"><a href={{workflowId}}>Workflow</a></div>
+          <hr class="horizontal-line">
           {{#each model.exceptions as |job|}}
             {{#cp-panels class='u-margin-bottom workflow-panel-cp' accordion=true as |panels|}}
               {{#panels.panel as |p|}}

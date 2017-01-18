@@ -66,6 +66,7 @@ object Dependencies {
     "com.jsuereth" %% "scala-arm" % "1.4",
     "commons-codec" % "commons-codec" % commonsCodecVersion,
     "commons-io" % "commons-io" % commonsIoVersion,
+    "javax.ws.rs" % "javax.ws.rs-api" % "2.0.1",
     "mysql" % "mysql-connector-java" % mysqlConnectorVersion,
     "org.apache.hadoop" % "hadoop-auth" % hadoopVersion % "compileonly",
     "org.apache.hadoop" % "hadoop-mapreduce-client-core" % hadoopVersion % "compileonly",
@@ -89,12 +90,8 @@ object Dependencies {
     "org.mockito" % "mockito-core" % "1.10.19" exclude ("org.hamcrest", "hamcrest-core"),
     "org.jmockit" % "jmockit" % "1.23" % Test,
     "org.scala-lang.modules" %% "scala-async" % "0.9.5",
-    "org.scalatest" %% "scalatest" % "3.0.0" % Test,
-
     "org.apache.httpcomponents" % "httpclient" % "4.5.2",
-    "org.glassfish.jersey.media" % "jersey-media-multipart" % jerseyVersion,
-    "org.glassfish.jersey.media" % "jersey-media-json-jettison" % jerseyVersion
-
+    "org.scalatest" %% "scalatest" % "3.0.0" % Test
 
   ) :+ sparkExclusion
 
