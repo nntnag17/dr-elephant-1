@@ -22,12 +22,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 
-/*
+/**
 * Given a MR Task log, sets the exception (if any) in the log
 */
 public class MRTaskLogAnalyzer {
   private static final Logger logger = Logger.getLogger(MRTaskLogAnalyzer.class);
   private LoggingEvent _exception;
+  private long MAX_EXCEPTIONS = 5;
   private Pattern mrTaskExceptionPattern =
       Pattern.compile("Error: (.*\\n(?:.*\\tat.+\\n)+(?:.*Caused by.+\\n(?:.*\\n)?(?:.*\\s+at.+\\n)*)*)");
 
@@ -45,14 +46,16 @@ public class MRTaskLogAnalyzer {
 
   /**
    * Sets the exception of the mr task
-   * @param rawLog
+   * @param rawLog Raw log of the task
    */
   private void setException(String rawLog) {
     Matcher matcher = mrTaskExceptionPattern.matcher(rawLog);
-    if (matcher.find()) {
-      this._exception = new LoggingEvent(matcher.group());
-    } else {
-      this._exception = new LoggingEvent("");
+    long limitOnExceptionChains = MAX_EXCEPTIONS;
+    StringBuilder exceptionBuilder = new StringBuilder();
+    while (matcher.find() && limitOnExceptionChains>=0) {
+      exceptionBuilder.append(matcher.group());
+      limitOnExceptionChains--;
     }
+      this._exception = new LoggingEvent(exceptionBuilder.toString());
   }
 }

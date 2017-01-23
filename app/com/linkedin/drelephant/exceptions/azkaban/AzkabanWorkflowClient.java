@@ -89,7 +89,7 @@ public class AzkabanWorkflowClient implements WorkflowClient {
   private String _password;
 
   private String AZKABAN_LOG_OFFSET = "0";
-  private String AZKABAN_LOG_LENGTH_LIMIT = "99999999";
+  private String AZKABAN_LOG_LENGTH_LIMIT = "9999999"; // limit the log limit to 10 mb
 
   Map<String, AzkabanJobLogAnalyzer> jobIdToLog;
 

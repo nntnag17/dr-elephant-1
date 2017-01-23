@@ -52,6 +52,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Arrays;
 
+import javax.naming.AuthenticationException;
 import models.AppHeuristicResult;
 import models.AppHeuristicResultDetails;
 import models.AppResult;
@@ -1758,7 +1759,8 @@ public class Web extends Controller {
    * Controls Exceptions
    * @throws URISyntaxException
    */
-  public static Result restExceptions() throws URISyntaxException, MalformedURLException, IOException {
+  public static Result restExceptions() throws URISyntaxException, MalformedURLException, IOException,
+                                               AuthenticationException {
     DynamicForm form = Form.form().bindFromRequest(request());
     String url = form.get("flow-exec-url");
     JsonObject parent = new JsonObject();
@@ -1792,15 +1794,14 @@ public class Web extends Controller {
           JsonObject job = new JsonObject();
           job.addProperty(JsonKeys.NAME, jobException.getId());
           job.addProperty(JsonKeys.TYPE, jobException.getType().toString());
+          job.addProperty(JsonKeys.ID, jobException.getId());
 
           if (jobException.getType() == HadoopException.HadoopExceptionType.SCHEDULER) {
             if (jobException.getLoggingEvent() != null && jobException.getLoggingEvent().getLog() != null) {
               job.addProperty(JsonKeys.EXCEPTION_SUMMARY, getSchedulerLog(jobException.getLoggingEvent().getLog()));
-              job.addProperty(JsonKeys.ID, url);
               job.addProperty(JsonKeys.STATUS, "failed");
             } else {
               job.addProperty(JsonKeys.EXCEPTION_SUMMARY, "");
-              job.addProperty(JsonKeys.ID, url);
               job.addProperty(JsonKeys.STATUS, "failed");
             }
           }
@@ -1809,11 +1810,9 @@ public class Web extends Controller {
           if (jobException.getType() == HadoopException.HadoopExceptionType.SCRIPT) {
             if (jobException.getLoggingEvent() != null && jobException.getLoggingEvent().getLog() != null) {
               job.addProperty(JsonKeys.EXCEPTION_SUMMARY, getSchedulerLog(jobException.getLoggingEvent().getLog()));
-              job.addProperty(JsonKeys.ID, url);
               job.addProperty(JsonKeys.STATUS, "failed");
             } else {
               job.addProperty(JsonKeys.EXCEPTION_SUMMARY, "");
-              job.addProperty(JsonKeys.ID, url);
               job.addProperty(JsonKeys.STATUS, "failed");
             }
           }
@@ -1852,11 +1851,6 @@ public class Web extends Controller {
               mrExceptionsArray.add(child);
             }
             job.add(JsonKeys.APPLICATIONS, mrExceptionsArray);
-            if(jobException.getId()!=null) {
-              job.addProperty(JsonKeys.ID, jobException.getId());
-            } else {
-              job.addProperty(JsonKeys.ID,url);
-            }
             job.addProperty(JsonKeys.STATUS, "failed");
           }
           jobsArray.add(job);

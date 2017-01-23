@@ -34,7 +34,7 @@ public class MRJobLogAnalyzer {
   private Pattern _mrJobExceptionPattern =
       Pattern.compile(".*\\n(?:.*\\tat.+\\n)+(?:.*Caused by.+\\n(?:.*\\n)?(?:.*\\s+at.+\\n)*)*");
   private Pattern _unsuccessfulMRTaskIdPattern =
-      Pattern.compile("Task (?:failed|killed) (task_[0-9]+_[0-9]+_[mr]_[0-9]+)");
+      Pattern.compile("Task (?:failed) (task_[0-9]+_[0-9]+_[mr]_[0-9]+)");
   private LoggingEvent _exception;
   private Set<String> _failedSubEvents;
 

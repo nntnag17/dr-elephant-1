@@ -56,6 +56,7 @@
           <div class="summary-list-header"><a href={{workflowId}}>Workflow</a></div>
           <hr class="horizontal-line">
           {{#each model.exceptions as |job|}}
+
             {{#cp-panels class='u-margin-bottom workflow-panel-cp' accordion=true as |panels|}}
               {{#panels.panel as |p|}}
                 {{#if (eq job.type "MR")}}
@@ -84,6 +85,7 @@
                 {{/if}}
               {{/panels.panel}}
             {{/cp-panels}}
+
           {{/each}}
           <br/>
         </div>

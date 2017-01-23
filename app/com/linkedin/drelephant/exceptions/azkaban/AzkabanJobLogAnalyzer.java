@@ -18,6 +18,7 @@ package com.linkedin.drelephant.exceptions.azkaban;
 
 import com.linkedin.drelephant.exceptions.JobState;
 import com.linkedin.drelephant.exceptions.LoggingEvent;
+import java.util.LinkedHashSet;
 import org.apache.log4j.Logger;
 
 import java.util.HashSet;
@@ -40,11 +41,14 @@ public class AzkabanJobLogAnalyzer {
   private Pattern _killedAzkabanJobPattern =
       Pattern.compile("Finishing job [^\\s]+ attempt: [0-9]+ at [0-9]+ with status KILLED");
   private Pattern _scriptFailPattern = Pattern.compile("ERROR - Job run failed!");
-  private Pattern _scriptOrMRFailExceptionPattern =
-      Pattern.compile(".+\\n(?:.+\\tat.+\\n)+(?:.+Caused by.+\\n(?:.*\\n)?(?:.+\\s+at.+\\n)*)*");
+  // Alternate pattern: (".+\\n(?:.+\\tat.+\\n)+(?:.+Caused by.+\\n(?:.*\\n)?(?:.+\\s+at.+\\n)*)*");
+  private Pattern _scriptOrMRFailExceptionPattern = Pattern.compile("(Caused by.+\\n(?:.*\\n)?((?:.+\\s+at.+\\n)*))+");
   private Pattern _azkabanFailExceptionPattern = Pattern.compile(
       "\\d{2}[-/]\\d{2}[-/]\\d{4} \\d{2}:\\d{2}:\\d{2} (PST|PDT) [^\\s]+ (?:ERROR|WARN|FATAL|Exception) .*\\n");
   private Pattern _mrJobIdPattern = Pattern.compile("job_[0-9]+_[0-9]+");
+  private Pattern _mrPigJobIdPattern = Pattern.compile("job job_[0-9]+_[0-9]+ has failed!");
+  private Pattern _mrHiveJobIdPattern = Pattern.compile("ERROR Ended Job = job_[0-9]+_[0-9]+ with errors");
+  private static long SAMPLING_SIZE = 5;
 
   /**
    * Failure at Azkaban job log is broadly categorized into three categorized into three categories
@@ -55,20 +59,29 @@ public class AzkabanJobLogAnalyzer {
   private JobState _state;
   private LoggingEvent _exception;
   private Set<String> _subEvents;
+  private String _rawLog;
 
   public AzkabanJobLogAnalyzer(String rawLog) {
-    setSubEvents(rawLog);
-    if (_successfulAzkabanJobPattern.matcher(rawLog).find()) {
+    this._rawLog = rawLog;
+    setSubEvents();
+    analyzeLog();
+  }
+
+  /**
+   * Analyzes the log to find the level of exception
+   */
+  private void analyzeLog() {
+    if (_successfulAzkabanJobPattern.matcher(_rawLog).find()) {
       succeededAzkabanJob();
-    } else if (_failedAzkabanJobPattern.matcher(rawLog).find()) {
+    } else if (_failedAzkabanJobPattern.matcher(_rawLog).find()) {
       if (!_subEvents.isEmpty()) {
-        mrLevelFailedAzkabanJob(rawLog);
-      } else if (_scriptFailPattern.matcher(rawLog).find()) {
-        scriptLevelFailedAzkabanJob(rawLog);
+        mrLevelFailedAzkabanJob();
+      } else if (_scriptFailPattern.matcher(_rawLog).find()) {
+        scriptLevelFailedAzkabanJob();
       } else {
-        azkabanLevelFailedAzkabanJob(rawLog);
+        azkabanLevelFailedAzkabanJob();
       }
-    } else if (_killedAzkabanJobPattern.matcher(rawLog).find()) {
+    } else if (_killedAzkabanJobPattern.matcher(_rawLog).find()) {
       killedAzkabanJob();
     }
   }
@@ -83,37 +96,40 @@ public class AzkabanJobLogAnalyzer {
 
   /**
    * Sets _state and _exception for Azkaban job which failed at the MR Level
-   * @param rawLog Raw Azkaban Job Log
    */
-  private void mrLevelFailedAzkabanJob(String rawLog) {
+  private void mrLevelFailedAzkabanJob() {
     this._state = JobState.MRFAIL;
-    Matcher matcher = _scriptOrMRFailExceptionPattern.matcher(rawLog);
-    if (matcher.find()) {
-      this._exception = new LoggingEvent(matcher.group());
-      // fetching stacktrace form azkaban job log only for the case if mr logs are not present in job history server
-      // so in that this stacktrace can be presented to the user
+    Matcher matcher = _scriptOrMRFailExceptionPattern.matcher(_rawLog);
+    StringBuilder exceptionBuilder = new StringBuilder();
+    long limit = SAMPLING_SIZE;
+    while (matcher.find() && limit > 0) {
+      limit--;
+      exceptionBuilder.append(matcher.group());
     }
+    this._exception = new LoggingEvent(exceptionBuilder.toString());
   }
 
   /**
    * Set _state and _exception for Azkaban job which failed at the Script Level
-   * @param rawLog Raw Azkaban Job log
    */
-  private void scriptLevelFailedAzkabanJob(String rawLog) {
+  private void scriptLevelFailedAzkabanJob() {
     this._state = JobState.SCRIPTFAIL;
-    Matcher matcher = _scriptOrMRFailExceptionPattern.matcher(rawLog);
-    if (matcher.find()) {
-      this._exception = new LoggingEvent(matcher.group());
+    Matcher matcher = _scriptOrMRFailExceptionPattern.matcher(_rawLog);
+    StringBuilder exceptionBuilder = new StringBuilder();
+    long limit = SAMPLING_SIZE;
+    while (matcher.find() && limit > 0) {
+      limit--;
+      exceptionBuilder.append(matcher.group());
     }
+    this._exception = new LoggingEvent(exceptionBuilder.toString());
   }
 
   /**
    * Set _state and _exception for Azkaban job which failed at the Azkaban Level
-   * @param rawLog Raw Azkaban job log
    */
-  private void azkabanLevelFailedAzkabanJob(String rawLog) {
+  private void azkabanLevelFailedAzkabanJob() {
     this._state = JobState.SCHEDULERFAIL;
-    Matcher matcher = _azkabanFailExceptionPattern.matcher(rawLog);
+    Matcher matcher = _azkabanFailExceptionPattern.matcher(_rawLog);
     if (matcher.find()) {
       this._exception = new LoggingEvent(matcher.group());
     }
@@ -143,12 +159,41 @@ public class AzkabanJobLogAnalyzer {
 
   /**
    * Sets _subEvents equal to the list of mr job ids in the given Azkaban job log
-   * @param rawLog Raw Azkaban job log
    */
-  private void setSubEvents(String rawLog) {
-    Set<String> subEvents = new HashSet<String>();
-    Matcher matcher = _mrJobIdPattern.matcher(rawLog);
-    while (matcher.find()) {
+  private void setSubEvents() {
+    Set<String> subEvents = new LinkedHashSet<String>();
+
+    // check for pig jobs
+    Matcher pigJobMatcher = _mrPigJobIdPattern.matcher(_rawLog);
+    while (pigJobMatcher.find()) {
+      String pigJobFailedString = pigJobMatcher.group();
+      Matcher jobIdMatcher = _mrJobIdPattern.matcher(pigJobFailedString);
+      if (jobIdMatcher.find()) {
+        subEvents.add(jobIdMatcher.group());
+        this._subEvents = subEvents;
+        return;
+      }
+    }
+
+    pigJobMatcher.reset();
+
+    // check for hive jobs
+    Matcher hiveJobMatcher = _mrHiveJobIdPattern.matcher(_rawLog);
+    while (hiveJobMatcher.find()) {
+      String hiveJobFailedString = hiveJobMatcher.group();
+      Matcher jobIdMatcher = _mrJobIdPattern.matcher(hiveJobFailedString);
+      if (jobIdMatcher.find()) {
+        subEvents.add(jobIdMatcher.group());
+        this._subEvents = subEvents;
+        return;
+      }
+    }
+
+    // any other job than pig or hive
+    Matcher matcher = _mrJobIdPattern.matcher(_rawLog);
+    long counter = SAMPLING_SIZE;  // sample the applications
+    while (matcher.find() && counter > 0) {
+      counter--;
       subEvents.add(matcher.group());
     }
     this._subEvents = subEvents;

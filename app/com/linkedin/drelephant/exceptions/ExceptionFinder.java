@@ -17,8 +17,12 @@
 package com.linkedin.drelephant.exceptions;
 
 import com.linkedin.drelephant.configurations.scheduler.SchedulerConfigurationData;
+import com.linkedin.drelephant.security.HadoopSecurity;
 import com.linkedin.drelephant.util.InfoExtractor;
 import java.io.File;
+import java.io.IOException;
+import java.security.PrivilegedAction;
+import javax.naming.AuthenticationException;
 import org.apache.log4j.Logger;
 
 import java.net.MalformedURLException;
@@ -42,6 +46,7 @@ public class ExceptionFinder {
   private static String USERNAME = "username";
   private static String PRIVATE_KEY  = "private_key";
   private static String PASSWORD = "password";
+  private static int SAMPLE_SIZE = 3;
 
   /**
    * Constructor for ExceptionFinder class
@@ -51,7 +56,7 @@ public class ExceptionFinder {
    * @throws MalformedURLException
    */
   public ExceptionFinder(String url, String scheduler)
-      throws URISyntaxException, MalformedURLException {
+      throws URISyntaxException, MalformedURLException, AuthenticationException, IOException {
 
     // create a new MRClient
     _mrClient = new MRClient();
@@ -88,25 +93,32 @@ public class ExceptionFinder {
    * @param execUrl the execution URL of the flow
    * @return HadoopException object which captures all the exceptions in the given Flow
    */
-  private HadoopException analyzeFlow(String execUrl) {
-    HadoopException flowLevelException = new HadoopException();
-    List<HadoopException> childExceptions = new ArrayList<HadoopException>();
-    Map<String,String> jobIdStatus = _workflowClient.getJobsFromFlow();
+  private HadoopException analyzeFlow(final String execUrl) throws AuthenticationException, IOException {
+    HadoopSecurity _hadoopSecurity = HadoopSecurity.getInstance();
 
-    // Find exceptions in all the unsuccessful jobs of the workflow
-    for (String unsuccessfulJobId : jobIdStatus.keySet()) {
-      if(jobIdStatus.get(unsuccessfulJobId).toLowerCase().equals("failed")) {
-        HadoopException jobLevelException = analyzeJob(unsuccessfulJobId);
-        childExceptions.add(jobLevelException);
+    return _hadoopSecurity.doAs(new PrivilegedAction<HadoopException>() {
+      @Override
+      public HadoopException run() {
+        HadoopException flowLevelException = new HadoopException();
+        List<HadoopException> childExceptions = new ArrayList<HadoopException>();
+        Map<String, String> jobIdStatus = _workflowClient.getJobsFromFlow();
+
+        // Find exceptions in all the unsuccessful jobs of the workflow
+        for (String unsuccessfulJobId : jobIdStatus.keySet()) {
+          if (jobIdStatus.get(unsuccessfulJobId).toLowerCase().equals("failed")) {
+            HadoopException jobLevelException = analyzeJob(unsuccessfulJobId);
+            childExceptions.add(jobLevelException);
+          }
+        }
+
+        flowLevelException.setType(HadoopException.HadoopExceptionType.FLOW);
+        flowLevelException.setId(execUrl);
+        flowLevelException.setLoggingEvent(null); // No flow level exception
+        flowLevelException.setChildExceptions(childExceptions);
+        return flowLevelException;
       }
-    }
-
-    flowLevelException.setType(HadoopException.HadoopExceptionType.FLOW);
-    flowLevelException.setId(execUrl);
-    flowLevelException.setLoggingEvent(null); // No flow level exception
-    flowLevelException.setChildExceptions(childExceptions);
-    return flowLevelException;
-  }
+    });
+ }
 
   /**
    * Given a failed Job, this method analyzes the job and returns a HadoopException object which captures all the exception in the given job.
@@ -169,11 +181,19 @@ public class ExceptionFinder {
     MRJobLogAnalyzer analyzedLog = new MRJobLogAnalyzer(rawMRJoblog);
     Set<String> failedMRTaskIds = analyzedLog.getFailedSubEvents();
 
+    // sampling of tasks
+    int samplingSize = SAMPLE_SIZE;
     for (String failedMRTaskId : failedMRTaskIds) {
+      if(samplingSize<=0) {
+        break;
+      }
       String rawMRTaskLog = _mrClient.getMRTaskLog(mrJobId, failedMRTaskId);
       HadoopException mrTaskLevelException = analyzeMRTask(failedMRTaskId, rawMRTaskLog);
       childExceptions.add(mrTaskLevelException);
+
+      samplingSize--;
     }
+
     mrJobLevelException.setChildExceptions(childExceptions);
     mrJobLevelException.setLoggingEvent(analyzedLog.getException());
     mrJobLevelException.setType(HadoopException.HadoopExceptionType.MRJOB);
